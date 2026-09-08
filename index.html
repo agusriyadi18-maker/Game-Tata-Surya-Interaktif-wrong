@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SolarExplorer 3D - Petualangan Tata Surya</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        space: {
+                            900: '#030712',
+                            800: '#0b1329',
+                            700: '#111827',
+                            accent: '#38bdf8'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            background-color: #030712;
+            color: #f3f4f6;
+        }
+        
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            outline: none;
+        }
+
+        /* Glassmorphism Styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.4);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.8);
+        }
+
+        /* Pulse glowing effect */
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(56, 189, 248, 0.7); }
+        }
+        .glow-effect {
+            animation: glow 3s infinite ease-in-out;
+        }
+
+        /* Fade Animations */
+        .animated-fade-in {
+            animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+</head>
+<body class="w-screen h-screen overflow-hidden text-slate-100 bg-space-900">
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <!-- UI Overlay Top Bar -->
+    <header class="absolute top-0 left-0 right-0 z-20 p-4 flex flex-wrap items-center justify-between gap-4 pointer-events-none">
+        <!-- Logo & Title -->
+        <div class="glass-panel px-5 py-2.5 rounded-2xl flex items-center gap-3 pointer-events-auto shadow-2xl">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-lg shadow-cyan-500/30">
+                <i class="fa-solid fa-globe"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-extrabold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-sky-200 to-indigo-300">
+                    SolarExplorer 3D
+                </h1>
+                <p class="text-xs text-slate-400">Petualangan Interaktif Tata Surya</p>
+            </div>
+        </div>
+
+        <!-- Mode Buttons Navigation -->
+        <nav class="glass-panel p-1.5 rounded-2xl flex items-center gap-1.5 pointer-events-auto shadow-xl max-md:overflow-x-auto max-md:max-w-full">
+            <button id="nav-explore" onclick="switchGameMode('explore')" class="nav-btn active px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                <i class="fa-solid fa-compass"></i> <span>Eksplorasi</span>
+            </button>
+            <button id="nav-order" onclick="switchGameMode('order')" class="nav-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 text-slate-300 hover:text-white hover:bg-slate-800/60">
+                <i class="fa-solid fa-arrow-down-1-9"></i> <span>Susun Planet</span>
+            </button>
+            <button id="nav-mission" onclick="switchGameMode('mission')" class="nav-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 text-slate-300 hover:text-white hover:bg-slate-800/60">
+                <i class="fa-solid fa-crosshairs"></i> <span>Misi Detektif</span>
+            </button>
+            <button id="nav-quiz" onclick="switchGameMode('quiz')" class="nav-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 text-slate-300 hover:text-white hover:bg-slate-800/60">
+                <i class="fa-solid fa-graduation-cap"></i> <span>Kuis</span>
+            </button>
+        </nav>
+
+        <!-- Global Utility Controls -->
+        <div class="glass-panel px-3 py-2 rounded-2xl flex items-center gap-2 pointer-events-auto shadow-xl">
+            <!-- Audio Toggle -->
+            <button id="btn-audio" onclick="toggleAudio()" class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" title="Beralih Suara Ambient">
+                <i class="fa-solid fa-volume-high text-sm"></i>
+            </button>
+            <!-- Orbit Lines Toggle -->
+            <button id="btn-orbits" onclick="toggleOrbits()" class="w-9 h-9 rounded-xl flex items-center justify-center text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors" title="Tampilkan/Sembunyikan Garis Orbit">
+                <i class="fa-solid fa-circle-notch text-sm"></i>
+            </button>
+            <!-- Speed Control Dropdown -->
+            <div class="flex items-center gap-1 pl-2 border-l border-slate-700/60">
+                <i class="fa-solid fa-gauge text-xs text-slate-400 ml-1"></i>
+                <select id="speed-select" onchange="changeSpeed(this.value)" class="bg-transparent text-xs font-semibold text-slate-200 outline-none cursor-pointer py-1 px-1">
+                    <option value="0" class="bg-slate-900">Pause</option>
+                    <option value="0.5" class="bg-slate-900">0.5x</option>
+                    <option value="1" selected class="bg-slate-900">1.0x Normal</option>
+                    <option value="3" class="bg-slate-900">3.0x Cepat</option>
+                    <option value="8" class="bg-slate-900">8.0x Super</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Planet Detail Info Drawer (Slide-in) -->
+    <aside id="info-drawer" class="hidden absolute top-20 right-4 bottom-20 w-80 sm:w-96 z-20 glass-panel rounded-3xl p-6 overflow-y-auto flex-col justify-between shadow-2xl animated-fade-in pointer-events-auto border border-cyan-500/30">
+        <div>
+            <!-- Header & Close -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-700/60">
+                <span id="drawer-type" class="text-xs font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">
+                    Planet Kebumian
+                </span>
+                <button onclick="closeInfoDrawer()" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Title & Subtitle -->
+            <div class="mt-4 mb-4">
+                <h2 id="drawer-name" class="text-3xl font-black text-white tracking-tight">Bumi</h2>
+                <p id="drawer-tagline" class="text-xs text-slate-400 mt-1 italic">Rumah Utama Kehidupan Manusia</p>
+            </div>
+
+            <!-- Actions: Speak & Focus Camera -->
+            <div class="flex items-center gap-2 mb-6">
+                <button id="btn-speech" onclick="speakPlanetInfo()" class="flex-1 py-2 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-2 border border-cyan-500/30 transition">
+                    <i class="fa-solid fa-volume-low"></i> <span>Dengarkan Narasi</span>
+                </button>
+                <button onclick="resetCameraView()" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 transition" title="Kembali ke Tampak Atas Tata Surya">
+                    <i class="fa-solid fa-expand"></i> <span>Reset View</span>
+                </button>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 gap-2.5 mb-6">
+                <div class="glass-card p-3 rounded-2xl">
+                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-ruler-horizontal text-cyan-400 mr-1"></i> Jarak dr Sun
+                    </div>
+                    <div id="stat-distance" class="text-sm font-bold text-slate-100">1 AU (149.6M km)</div>
+                </div>
+                <div class="glass-card p-3 rounded-2xl">
+                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-circle text-amber-400 mr-1"></i> Diameter
+                    </div>
+                    <div id="stat-diameter" class="text-sm font-bold text-slate-100">12,742 km</div>
+                </div>
+                <div class="glass-card p-3 rounded-2xl">
+                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-rotate-right text-emerald-400 mr-1"></i> Periode Revolusi
+                    </div>
+                    <div id="stat-orbit" class="text-sm font-bold text-slate-100">365.25 Hari</div>
+                </div>
+                <div class="glass-card p-3 rounded-2xl">
+                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-arrows-spin text-purple-400 mr-1"></i> Periode Rotasi
+                    </div>
+                    <div id="stat-rotation" class="text-sm font-bold text-slate-100">24 Jam</div>
+                </div>
+                <div class="glass-card p-3 rounded-2xl">
+                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-temperature-half text-rose-400 mr-1"></i> Suhu Rata-rata
+                    </div>
+                    <div id="stat-temp" class="text-sm font-bold text-slate-100">15 °C</div>
+                </div>
+                <div class="glass-card p-3 rounded-2xl">
+                    <div class="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-moon text-indigo-400 mr-1"></i> Satelit Alami
+                    </div>
+                    <div id="stat-moons" class="text-sm font-bold text-slate-100">1 (Bulan)</div>
+                </div>
+            </div>
+
+            <!-- Description & Fun Facts -->
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Deskripsi Singkat</h3>
+                    <p id="drawer-desc" class="text-xs text-slate-300 leading-relaxed font-normal">
+                        Bumi adalah planet ketiga dari Matahari dan satu-satunya objek astronomi yang diketahui menampung kehidupan.
+                    </p>
+                </div>
+                <div class="bg-cyan-950/40 border border-cyan-500/20 p-3.5 rounded-2xl">
+                    <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-lightbulb text-amber-400"></i> Fakta Unik
+                    </h3>
+                    <p id="drawer-fact" class="text-xs text-slate-300 leading-relaxed italic">
+                        Sekitar 71% permukaan Bumi tertutup oleh air, dan atmosfernya kaya akan oksigen serta nitrogen.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Mode 1 Overlay: Order Planets Game Panel -->
+    <div id="game-order-panel" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-4xl glass-panel p-5 rounded-3xl shadow-2xl animated-fade-in pointer-events-auto border border-cyan-500/30">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-down-1-9 text-cyan-400"></i>
+                    <span>Tantangan Urutan Planet</span>
+                </h2>
+                <p class="text-xs text-slate-400">Klik atau seret planet ke slot urutan dari terdekat hingga terjauh dari Matahari!</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Skor</div>
+                    <div id="order-score" class="text-lg font-black text-cyan-400">0 Poin</div>
+                </div>
+                <button onclick="resetOrderGame()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Target Slots Container -->
+        <div id="order-slots-container" class="grid grid-cols-4 sm:grid-cols-8 gap-2 mb-4">
+            <!-- Dynamically populated 8 target slots -->
+        </div>
+
+        <!-- Available Planets Pool -->
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pilih Planet:</div>
+        <div id="order-planets-pool" class="flex flex-wrap gap-2 justify-center">
+            <!-- Dynamically populated available planet buttons -->
+        </div>
+    </div>
+
+    <!-- Mode 2 Overlay: Detective Mission Panel -->
+    <div id="game-mission-panel" class="hidden absolute top-20 left-1/2 -translate-x-1/2 z-20 w-[90%] max-w-xl glass-panel p-5 rounded-3xl shadow-2xl animated-fade-in pointer-events-auto border border-amber-500/30">
+        <div class="flex items-center justify-between mb-3 border-b border-slate-700/60 pb-3">
+            <div class="flex items-center gap-2">
+                <span class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-user-ninja"></i>
+                </span>
+                <div>
+                    <h2 class="text-sm font-bold text-white">Misi Detektif Antariksa</h2>
+                    <span id="mission-step-indicator" class="text-xs text-amber-400 font-semibold">Misi 1 dari 5</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-400 uppercase font-semibold">Sisa Waktu</div>
+                    <div id="mission-timer" class="text-base font-black text-amber-400">25s</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mission Clue Box -->
+        <div class="bg-amber-950/30 border border-amber-500/30 p-4 rounded-2xl mb-4">
+            <div class="text-xs font-bold text-amber-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-magnifying-glass"></i> Petunjuk Rahasia:
+            </div>
+            <p id="mission-clue-text" class="text-sm text-slate-200 font-medium leading-relaxed">
+                Temukan planet terbesar di Tata Surya yang terkenal dengan Bintik Merah Raksasa dan cincin samar!
+            </p>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-400">
+            <span><i class="fa-solid fa-hand-pointer text-cyan-400 mr-1"></i> Putar ruang 3D & KLIK planet target!</span>
+            <span id="mission-score" class="font-bold text-slate-200">Skor Misi: 0</span>
+        </div>
+    </div>
+
+    <!-- Mode 3 Overlay: Quiz Panel -->
+    <div id="game-quiz-panel" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-[92%] max-w-xl glass-panel p-6 rounded-3xl shadow-2xl animated-fade-in pointer-events-auto border border-indigo-500/30">
+        <!-- Quiz Header -->
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-700/60">
+            <div>
+                <span class="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                    Kuis Astronomi
+                </span>
+                <h2 id="quiz-question-number" class="text-lg font-black text-white mt-2">Pertanyaan 1/5</h2>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] text-slate-400 uppercase font-semibold">Skor Kuis</div>
+                <div id="quiz-score" class="text-xl font-black text-indigo-400">0 Poin</div>
+            </div>
+        </div>
+
+        <!-- Question Box -->
+        <p id="quiz-question-text" class="text-sm sm:text-base font-semibold text-slate-100 mb-6 leading-relaxed">
+            Manakah planet yang dikenal sebagai "Planet Merah" karena kandungan besi oksida di permukaannya?
+        </p>
+
+        <!-- Options Buttons Container -->
+        <div id="quiz-options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            <!-- Dynamically rendered options -->
+        </div>
+
+        <!-- Explanation Modal Footer -->
+        <div id="quiz-feedback-box" class="hidden p-3.5 rounded-2xl text-xs leading-relaxed border transition-all">
+            <!-- Feedback content -->
+        </div>
+
+        <div class="mt-4 flex justify-end">
+            <button id="btn-quiz-next" onclick="nextQuizQuestion()" class="hidden px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white font-bold text-xs shadow-lg shadow-indigo-500/30 transition">
+                Pertanyaan Berikutnya <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Notification Alert (Replaces standard window.alert) -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animated-fade-in">
+        <div class="glass-panel p-6 rounded-3xl max-w-sm w-full text-center shadow-2xl border border-cyan-500/40">
+            <div id="modal-icon" class="w-16 h-16 rounded-2xl bg-cyan-500/20 text-cyan-400 text-3xl flex items-center justify-center mx-auto mb-4 border border-cyan-500/30">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h3 id="modal-title" class="text-xl font-black text-white mb-2">Selamat!</h3>
+            <p id="modal-message" class="text-xs text-slate-300 leading-relaxed mb-6">
+                Kamu telah menyelesaikan semua urutan planet dengan sempurna!
+            </p>
+            <button onclick="closeCustomModal()" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/30 hover:opacity-95 transition">
+                Lanjutkan
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Comprehensive Dataset for Planets (In Indonesian)
+        const PLANETS_DATA = [
+            {
+                id: 'sun',
+                name: 'Matahari',
+                tagline: 'Pusat Gravitasi Tata Surya Kita',
+                type: 'Bintang Induk',
+                color: 0xffaa00,
+                radius: 7.0,
+                distance: 0,
+                speed: 0,
+                realDistance: '0 AU (0 km)',
+                diameter: '1,392,700 km',
+                orbitPeriod: '230 Juta Tahun (Galaksi)',
+                rotationPeriod: '27 Hari',
+                temperature: '5,500 °C (Permukaan)',
+                moons: '8 Planet Utama',
+                desc: 'Matahari adalah bintang raksasa berupa bola plasma panas di pusat Tata Surya yang menyediakan energi sinar bagi kehidupan di Bumi.',
+                fact: 'Massa Matahari mencakup sekitar 99.86% dari seluruh massa gabungan di Tata Surya!'
+            },
+            {
+                id: 'mercury',
+                name: 'Merkurius',
+                tagline: 'Planet Terkecil & Terdekat dari Matahari',
+                type: 'Planet Kebumian',
+                color: 0xaaaaaa,
+                radius: 0.9,
+                distance: 14,
+                speed: 0.04,
+                realDistance: '0.39 AU (57.9M km)',
+                diameter: '4,879 km',
+                orbitPeriod: '88 Hari',
+                rotationPeriod: '59 Hari',
+                temperature: '-180°C hingga 430°C',
+                moons: '0',
+                desc: 'Merkurius adalah planet berbatu terkecil yang dipenuhi kawah vulkanik mirip permukaan Bulan karena atmosfernya sangat tipis.',
+                fact: 'Meskipun paling dekat dengan Matahari, Merkurius bukanlah planet terpanas di Tata Surya.'
+            },
+            {
+                id: 'venus',
+                name: 'Venus',
+                tagline: 'Bintang Kejora yang Sangat Panas',
+                type: 'Planet Kebumian',
+                color: 0xe3bb76,
+                radius: 1.4,
+                distance: 21,
+                speed: 0.015,
+                realDistance: '0.72 AU (108.2M km)',
+                diameter: '12,104 km',
+                orbitPeriod: '225 Hari',
+                rotationPeriod: '243 Hari (Terbalik)',
+                temperature: '465 °C',
+                moons: '0',
+                desc: 'Venus diselimuti awan asam sulfat tebal yang memerangkap panas secara ekstrem melalui efek rumah kaca tingkat tinggi.',
+                fact: 'Venus berotasi dari timur ke barat (terbalik dari planet lain) dan satu harinya lebih lama dari satu tahunnya!'
+            },
+            {
+                id: 'earth',
+                name: 'Bumi',
+                tagline: 'Planet Biru Rumah Kehidupan',
+                type: 'Planet Kebumian',
+                color: 0x2b82c5,
+                radius: 1.5,
+                distance: 29,
+                speed: 0.01,
+                realDistance: '1.00 AU (149.6M km)',
+                diameter: '12,742 km',
+                orbitPeriod: '365.25 Hari',
+                rotationPeriod: '24 Jam',
+                temperature: '15 °C',
+                moons: '1 (Bulan)',
+                desc: 'Bumi adalah planet ketiga dari Matahari dengan atmosfer kaya oksigen dan samudra air cair yang mendukung jutaan spesies makhluk hidup.',
+                fact: 'Sekitar 71% permukaan Bumi tertutup air, menjadikannya kelereng biru jika dilihat dari luar angkasa.'
+            },
+            {
+                id: 'mars',
+                name: 'Mars',
+                tagline: 'Planet Merah Berdebu & Bergunung Raksasa',
+                type: 'Planet Kebumian',
+                color: 0xc85a32,
+                radius: 1.1,
+                distance: 37,
+                speed: 0.008,
+                realDistance: '1.52 AU (227.9M km)',
+                diameter: '6,779 km',
+                orbitPeriod: '687 Hari',
+                rotationPeriod: '24.6 Jam',
+                temperature: '-60 °C',
+                moons: '2 (Phobos & Deimos)',
+                desc: 'Mars memiliki warna merah akibat oksidasi besi (karat) di tanahnya. Memiliki gunung tertinggi di Tata Surya (Olympus Mons).',
+                fact: 'Olympus Mons di Mars tingginya hampir 3 kali lipat dari Gunung Everest di Bumi!'
+            },
+            {
+                id: 'jupiter',
+                name: 'Jupiter',
+                tagline: 'Raksasa Gas Terbesar di Tata Surya',
+                type: 'Raksasa Gas',
+                color: 0xb07f35,
+                radius: 3.6,
+                distance: 51,
+                speed: 0.004,
+                realDistance: '5.20 AU (778.5M km)',
+                diameter: '139,820 km',
+                orbitPeriod: '12 Tahun',
+                rotationPeriod: '9.9 Jam',
+                temperature: '-110 °C',
+                moons: '95 Satelit',
+                desc: 'Raksasa gas terbesar dengan massa dua kali lipat gabungan seluruh planet lainnya. Memiliki Bintik Merah Raksasa sebagai badai abadi.',
+                fact: 'Badai Bintik Merah Raksasa di Jupiter sudah berputar selama lebih dari 300 tahun dan ukurannya lebih besar dari planet Bumi!'
+            },
+            {
+                id: 'saturn',
+                name: 'Saturnus',
+                tagline: 'Perhiasan Cantik dengan Cincin Indah',
+                type: 'Raksasa Gas',
+                color: 0xe2bf7d,
+                radius: 3.0,
+                distance: 67,
+                speed: 0.003,
+                realDistance: '9.58 AU (1.4 Miliar km)',
+                diameter: '116,460 km',
+                orbitPeriod: '29.5 Tahun',
+                rotationPeriod: '10.7 Jam',
+                temperature: '-140 °C',
+                moons: '146 Satelit',
+                desc: 'Saturnus terkenal dengan sistem cincin yang megah dan spektakuler, terbuat dari miliaran partikel es, debu, dan batuan.',
+                fact: 'Saturnus memiliki massa jenis yang sangat rendah; jika ada wadah air yang sangat raksasa, Saturnus bisa terapung di atasnya!'
+            },
+            {
+                id: 'uranus',
+                name: 'Uranus',
+                tagline: 'Raksasa Es yang Berputar Miring',
+                type: 'Raksasa Es',
+                color: 0x4b70dd,
+                radius: 2.2,
+                distance: 82,
+                speed: 0.002,
+                realDistance: '19.22 AU (2.87 Miliar km)',
+                diameter: '50,724 km',
+                orbitPeriod: '84 Tahun',
+                rotationPeriod: '17.2 Jam (Miring 98°)',
+                temperature: '-195 °C',
+                moons: '28 Satelit',
+                desc: 'Planet raksasa es berwarna biru kehijauan dingin akibat gas metana di atmosfernya. Poros rotasinya sangat miring nyaris merebah.',
+                fact: 'Karena sumbu rotasinya yang miring ekstrem, kutub Uranus mengalami 42 tahun siang berturut-turut diikuti 42 tahun malam!'
+            },
+            {
+                id: 'neptune',
+                name: 'Neptunus',
+                tagline: 'Planet Biru Gelap Berangin Badai Kencang',
+                type: 'Raksasa Es',
+                color: 0x274687,
+                radius: 2.1,
+                distance: 96,
+                speed: 0.001,
+                realDistance: '30.05 AU (4.5 Miliar km)',
+                diameter: '49,244 km',
+                orbitPeriod: '165 Tahun',
+                rotationPeriod: '16.1 Jam',
+                temperature: '-200 °C',
+                moons: '16 Satelit',
+                desc: 'Planet paling jauh di Tata Surya kita dengan warna biru dalam yang dipenuhi angin badai supersonik tercepat di Tata Surya.',
+                fact: 'Kecepatan angin di Neptunus dapat mencapai lebih dari 2,100 km/jam, melampaui kecepatan suara!'
+            }
+        ];
+
+        // Global Game States
+        let scene, camera, renderer, controls;
+        let planetMeshes = {};
+        let orbitLines = [];
+        let moonMesh;
+        let selectedPlanet = null;
+        let simSpeed = 1.0;
+        let orbitsVisible = true;
+        let currentMode = 'explore'; // 'explore', 'order', 'mission', 'quiz'
+
+        // Audio State & Web Audio API Synthesizer
+        let audioCtx = null;
+        let audioEnabled = true;
+
+        // Mini-Game 1: Order State
+        let orderSlots = Array(8).fill(null);
+        let orderScore = 0;
+
+        // Mini-Game 2: Mission State
+        const MISSION_POOL = [
+            { targetId: 'jupiter', clue: 'Temukan planet terbesar di Tata Surya yang memiliki Bintik Merah Raksasa!' },
+            { targetId: 'mars', clue: 'Cari "Planet Merah" berbatu yang memiliki Gunung Olympus Mons!' },
+            { targetId: 'saturn', clue: 'Temukan planet raksasa gas indah dengan sistem cincin es paling megah!' },
+            { targetId: 'venus', clue: 'Cari planet terpanas beratmosfer tebal yang berotasi terbalik dari timur ke barat!' },
+            { targetId: 'mercury', clue: 'Temukan planet terkecil yang jaraknya paling dekat dengan Matahari!' },
+            { targetId: 'neptune', clue: 'Cari planet raksasa es biru paling jauh dengan angin badai terpecat!' },
+            { targetId: 'earth', clue: 'Temukan planet biru tempat tinggal kita yang kaya air tanah cair!' },
+            { targetId: 'uranus', clue: 'Cari raksasa es dingin yang berputar miring ekstrem hingga 98 derajat!' }
+        ];
+        let currentMissionIndex = 0;
+        let missionTimer = null;
+        let missionTimeLeft = 25;
+        let missionScore = 0;
+
+        // Mini-Game 3: Quiz State
+        const QUIZ_QUESTIONS = [
+            {
+                q: "Planet manakah yang terkenal sebagai planet paling terpanas di Tata Surya?",
+                options: ["Merkurius", "Venus", "Mars", "Jupiter"],
+                answer: 1,
+                exp: "Venus adalah yang terpanas (465°C) karena efek rumah kaca dari atmosfer karbon dioksida yang sangat tebal!"
+            },
+            {
+                q: "Planet apakah yang memiliki massa terbesar di Tata Surya kita?",
+                options: ["Saturnus", "Matahari", "Jupiter", "Neptunus"],
+                answer: 2,
+                exp: "Jupiter adalah planet terbesar, massanya lebih dari 2.5 kali gabungan seluruh planet lainnya!"
+            },
+            {
+                q: "Mengapa Mars berwarna kemerahan?",
+                options: ["Sangat panas", "Mengandung besi oksida (karat)", "Banyak lahar gunung", "Pantulan Matahari"],
+                answer: 1,
+                exp: "Debu di tanah permukaan Mars kaya akan senyawa besi oksida (seperti karat) yang memberinya warna merah khas."
+            },
+            {
+                q: "Planet manakah yang memiliki rotasi paling miring hingga seolah-olah merebah?",
+                options: ["Uranus", "Neptunus", "Saturnus", "Venus"],
+                answer: 0,
+                exp: "Uranus memiliki kemiringan sumbu rotasi ekstrem hingga 98 derajat, diduga akibat tabrakan raksasa purba."
+            },
+            {
+                q: "Berapa lama waktu yang dibutuhkan Bumi untuk mengelilingi Matahari (1 kali revolusi)?",
+                options: ["24 Jam", "30 Hari", "365.25 Hari", "12 Bulan 10 Hari"],
+                answer: 2,
+                exp: "Satu tahun Bumi disesuaikan dengan kurun waktu 365.25 hari revolusi mengelilingi Matahari."
+            }
+        ];
+        let quizIndex = 0;
+        let quizScore = 0;
+
+        // Procedural Texture Generator Helper Functions using HTML Canvas
+        function generateProceduralTexture(type, colorHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            if (type === 'sun') {
+                const grad = ctx.createRadialGradient(256, 128, 10, 256, 128, 256);
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.2, '#fff176');
+                grad.addColorStop(0.6, '#ff9800');
+                grad.addColorStop(1, '#e65100');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 512, 256);
+
+                // Sunspots
+                ctx.fillStyle = 'rgba(100, 20, 0, 0.4)';
+                for(let i=0; i<30; i++) {
+                    let x = Math.random() * 512;
+                    let y = Math.random() * 256;
+                    let r = Math.random() * 8 + 2;
+                    ctx.beginPath();
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (type === 'jupiter') {
+                ctx.fillStyle = '#c89e6c';
+                ctx.fillRect(0, 0, 512, 256);
+                const bands = [
+                    '#e0c097', '#8d5b28', '#d0ab7d', '#5a3818', 
+                    '#f3e0be', '#8d5b28', '#c09867', '#e0c097'
+                ];
+                let h = 256 / bands.length;
+                for (let i = 0; i < bands.length; i++) {
+                    ctx.fillStyle = bands[i];
+                    ctx.fillRect(0, i * h + (Math.sin(i)*4), 512, h);
+                }
+                // Great Red Spot
+                ctx.fillStyle = '#b71c1c';
+                ctx.beginPath();
+                ctx.ellipse(320, 160, 35, 20, 0, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (type === 'saturn') {
+                ctx.fillStyle = '#e2bf7d';
+                ctx.fillRect(0, 0, 512, 256);
+                ctx.fillStyle = 'rgba(160, 120, 70, 0.3)';
+                for (let i = 0; i < 256; i += 12) {
+                    ctx.fillRect(0, i, 512, 5);
+                }
+            } else if (type === 'earth') {
+                ctx.fillStyle = '#1e3a8a'; // Deep Ocean
+                ctx.fillRect(0, 0, 512, 256);
+                ctx.fillStyle = '#15803d'; // Green Continents
+                for (let i = 0; i < 18; i++) {
+                    ctx.beginPath();
+                    let x = Math.random() * 512;
+                    let y = Math.random() * 200 + 28;
+                    let rx = Math.random() * 60 + 20;
+                    let ry = Math.random() * 40 + 15;
+                    ctx.ellipse(x, y, rx, ry, Math.random(), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Cloud swirls
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                for (let i = 0; i < 20; i++) {
+                    ctx.beginPath();
+                    ctx.arc(Math.random()*512, Math.random()*256, Math.random()*25+10, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            } else {
+                // Generic textured rocky/gaseous planet
+                ctx.fillStyle = '#' + colorHex.toString(16).padStart(6, '0');
+                ctx.fillRect(0, 0, 512, 256);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                for (let i = 0; i < 40; i++) {
+                    let x = Math.random() * 512;
+                    let y = Math.random() * 256;
+                    let r = Math.random() * 15 + 3;
+                    ctx.beginPath();
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+
+        // Generate Ring Texture for Saturn
+        function generateRingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+
+            const grad = ctx.createLinearGradient(0, 0, 512, 0);
+            grad.addColorStop(0, 'rgba(210, 180, 140, 0.1)');
+            grad.addColorStop(0.2, 'rgba(222, 184, 135, 0.8)');
+            grad.addColorStop(0.5, 'rgba(160, 120, 80, 0.9)');
+            grad.addColorStop(0.7, 'rgba(210, 180, 140, 0.4)');
+            grad.addColorStop(0.85, 'rgba(222, 184, 135, 0.8)');
+            grad.addColorStop(1, 'rgba(210, 180, 140, 0.0)');
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 512, 64);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function initThreeScene() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030712, 0.0015);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 65, 120);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            container.appendChild(renderer.domElement);
+
+            // OrbitControls setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 300;
+            controls.minDistance = 5;
+
+            // Ambient & Point Lighting
+            const ambientLight = new THREE.AmbientLight(0x333344, 1.2);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.PointLight(0xffffff, 2.5, 400);
+            scene.add(sunLight);
+
+            // Starfield Background Particle System
+            createStarfield();
+
+            // Create Sun and Planets
+            createCelestialBodies();
+
+            // Create Asteroid Belt
+            createAsteroidBelt();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+
+            // Start Animation Loop
+            animate();
+        }
+
+        function createStarfield() {
+            const starsGeo = new THREE.BufferGeometry();
+            const count = 3000;
+            const posArray = new Float32Array(count * 3);
+
+            for (let i = 0; i < count * 3; i += 3) {
+                posArray[i] = (Math.random() - 0.5) * 600;
+                posArray[i+1] = (Math.random() - 0.5) * 600;
+                posArray[i+2] = (Math.random() - 0.5) * 600;
+            }
+
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const starsMat = new THREE.PointsMaterial({
+                size: 0.8,
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8
+            });
+            const starField = new THREE.Points(starsGeo, starsMat);
+            scene.add(starField);
+        }
+
+        function createCelestialBodies() {
+            PLANETS_DATA.forEach((data) => {
+                const texture = generateProceduralTexture(data.id, data.color);
+                
+                let geometry = new THREE.SphereGeometry(data.radius, 32, 32);
+                let material;
+
+                if (data.id === 'sun') {
+                    material = new THREE.MeshBasicMaterial({
+                        map: texture
+                    });
+                } else {
+                    material = new THREE.MeshStandardMaterial({
+                        map: texture,
+                        roughness: 0.7,
+                        metalness: 0.1
+                    });
+                }
+
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.userData = { ...data, currentAngle: Math.random() * Math.PI * 2 };
+
+                // Sun Glow halo
+                if (data.id === 'sun') {
+                    const glowGeo = new THREE.SphereGeometry(data.radius * 1.2, 32, 32);
+                    const glowMat = new THREE.MeshBasicMaterial({
+                        color: 0xffaa00,
+                        transparent: true,
+                        opacity: 0.25
+                    });
+                    const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+                    mesh.add(glowMesh);
+                }
+
+                // Saturn's Rings
+                if (data.id === 'saturn') {
+                    const ringGeo = new THREE.RingGeometry(data.radius * 1.3, data.radius * 2.3, 64);
+                    // Rotate ring UVs to align radially
+                    const pos = ringGeo.attributes.position;
+                    const uv = ringGeo.attributes.uv;
+                    for (let i = 0; i < pos.count; i++) {
+                        const vertex = new THREE.Vector3().fromBufferAttribute(pos, i);
+                        uv.setXY(i, vertex.length() / (data.radius * 2.3), 0.5);
+                    }
+                    const ringMat = new THREE.MeshStandardMaterial({
+                        map: generateRingTexture(),
+                        side: THREE.DoubleSide,
+                        transparent: true,
+                        opacity: 0.95
+                    });
+                    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                    ringMesh.rotation.x = Math.PI / 2.3;
+                    mesh.add(ringMesh);
+                }
+
+                // Earth's Moon
+                if (data.id === 'earth') {
+                    const moonGeo = new THREE.SphereGeometry(0.35, 16, 16);
+                    const moonMat = new THREE.MeshStandardMaterial({
+                        color: 0xcccccc,
+                        roughness: 0.9
+                    });
+                    moonMesh = new THREE.Mesh(moonGeo, moonMat);
+                    moonMesh.userData = { distance: 2.8, angle: 0 };
+                    mesh.add(moonMesh);
+                }
+
+                // Initial Position
+                if (data.distance > 0) {
+                    mesh.position.x = Math.cos(mesh.userData.currentAngle) * data.distance;
+                    mesh.position.z = Math.sin(mesh.userData.currentAngle) * data.distance;
+
+                    // Create Orbit Line
+                    const orbitLine = createOrbitLine(data.distance);
+                    scene.add(orbitLine);
+                    orbitLines.push(orbitLine);
+                } else {
+                    mesh.position.set(0, 0, 0);
+                }
+
+                scene.add(mesh);
+                planetMeshes[data.id] = mesh;
+            });
+        }
+
+        function createOrbitLine(radius) {
+            const segments = 128;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array((segments + 1) * 3);
+
+            for (let i = 0; i <= segments; i++) {
+                const theta = (i / segments) * Math.PI * 2;
+                positions[i * 3] = Math.cos(theta) * radius;
+                positions[i * 3 + 1] = 0;
+                positions[i * 3 + 2] = Math.sin(theta) * radius;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.LineBasicMaterial({
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.25
+            });
+
+            return new THREE.LineLoop(geometry, material);
+        }
+
+        function createAsteroidBelt() {
+            const count = 600;
+            const geo = new THREE.DodecahedronGeometry(0.15, 0);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 });
+            const instancedMesh = new THREE.InstancedMesh(geo, mat, count);
+
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < count; i++) {
+                const dist = 42 + Math.random() * 5;
+                const angle = Math.random() * Math.PI * 2;
+                const y = (Math.random() - 0.5) * 1.5;
+
+                dummy.position.set(Math.cos(angle) * dist, y, Math.sin(angle) * dist);
+                dummy.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+                const scale = 0.5 + Math.random() * 0.8;
+                dummy.scale.set(scale, scale, scale);
+                dummy.updateMatrix();
+
+                instancedMesh.setMatrixAt(i, dummy.matrix);
+            }
+            scene.add(instancedMesh);
+        }
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+        }
+
+        function playSynthTone(freq, type, duration) {
+            if (!audioEnabled) return;
+            try {
+                initAudioContext();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = type || 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.log('Audio Context Error:', e);
+            }
+        }
+
+        function playClickSound() { playSynthTone(600, 'sine', 0.1); }
+        function playSuccessSound() { 
+            playSynthTone(523.25, 'triangle', 0.15); // C5
+            setTimeout(() => playSynthTone(659.25, 'triangle', 0.2), 100); // E5
+            setTimeout(() => playSynthTone(783.99, 'triangle', 0.3), 200); // G5
+        }
+        function playErrorSound() {
+            playSynthTone(220, 'sawtooth', 0.2);
+            setTimeout(() => playSynthTone(180, 'sawtooth', 0.25), 150);
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('btn-audio');
+            if (audioEnabled) {
+                btn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+                btn.classList.remove('text-slate-500');
+                btn.classList.add('text-slate-300');
+                playClickSound();
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-volume-xmark text-sm"></i>';
+                btn.classList.add('text-slate-500');
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate Sun
+            if (planetMeshes['sun']) {
+                planetMeshes['sun'].rotation.y += 0.002 * simSpeed;
+            }
+
+            // Update Planet Revolutions & Rotations
+            PLANETS_DATA.forEach((data) => {
+                if (data.distance > 0 && planetMeshes[data.id]) {
+                    const mesh = planetMeshes[data.id];
+
+                    // Orbit Revolution
+                    mesh.userData.currentAngle += data.speed * 0.2 * simSpeed;
+                    mesh.position.x = Math.cos(mesh.userData.currentAngle) * data.distance;
+                    mesh.position.z = Math.sin(mesh.userData.currentAngle) * data.distance;
+
+                    // Self Rotation
+                    mesh.rotation.y += 0.01 * simSpeed;
+                }
+            });
+
+            // Update Earth's Moon Orbit
+            if (planetMeshes['earth'] && moonMesh) {
+                moonMesh.userData.angle += 0.03 * simSpeed;
+                moonMesh.position.x = Math.cos(moonMesh.userData.angle) * moonMesh.userData.distance;
+                moonMesh.position.z = Math.sin(moonMesh.userData.angle) * moonMesh.userData.distance;
+            }
+
+            // Smooth camera transition if planet is focused
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        function onPointerDown(event) {
+            // Calculate pointer position in normalized device coordinates
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(Object.values(planetMeshes));
+
+            if (intersects.length > 0) {
+                const clickedMesh = intersects[0].object;
+                const planetData = clickedMesh.userData;
+
+                playClickSound();
+
+                if (currentMode === 'explore') {
+                    selectPlanet(planetData.id);
+                } else if (currentMode === 'mission') {
+                    checkMissionTarget(planetData.id);
+                }
+            }
+        }
+
+        function selectPlanet(planetId) {
+            const data = PLANETS_DATA.find(p => p.id === planetId);
+            if (!data) return;
+
+            selectedPlanet = data;
+
+            // Fill Drawer Details
+            document.getElementById('drawer-type').innerText = data.type;
+            document.getElementById('drawer-name').innerText = data.name;
+            document.getElementById('drawer-tagline').innerText = data.tagline;
+
+            document.getElementById('stat-distance').innerText = data.realDistance;
+            document.getElementById('stat-diameter').innerText = data.diameter;
+            document.getElementById('stat-orbit').innerText = data.orbitPeriod;
+            document.getElementById('stat-rotation').innerText = data.rotationPeriod;
+            document.getElementById('stat-temp').innerText = data.temperature;
+            document.getElementById('stat-moons').innerText = data.moons;
+
+            document.getElementById('drawer-desc').innerText = data.desc;
+            document.getElementById('drawer-fact').innerText = data.fact;
+
+            // Display Info Drawer
+            const drawer = document.getElementById('info-drawer');
+            drawer.classList.remove('hidden');
+            drawer.classList.add('flex');
+
+            // Smooth Camera Focus on Planet
+            focusCameraOnPlanet(planetMeshes[planetId]);
+        }
+
+        function closeInfoDrawer() {
+            const drawer = document.getElementById('info-drawer');
+            drawer.classList.add('hidden');
+            drawer.classList.remove('flex');
+            selectedPlanet = null;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        function focusCameraOnPlanet(targetMesh) {
+            const targetPos = targetMesh.position;
+            const radius = targetMesh.userData.radius;
+            const offset = radius * 4.5 + 4;
+
+            const endCamPos = new THREE.Vector3(
+                targetPos.x + offset,
+                targetPos.y + offset * 0.6,
+                targetPos.z + offset
+            );
+
+            // Smoothly lerp camera position
+            let duration = 1000; // ms
+            let startTime = performance.now();
+            let startCamPos = camera.position.clone();
+            let startTarget = controls.target.clone();
+
+            function animateCamera(now) {
+                let elapsed = now - startTime;
+                let progress = Math.min(elapsed / duration, 1);
+                let easeProgress = 0.5 - Math.cos(progress * Math.PI) / 2; // Ease in-out
+
+                camera.position.lerpVectors(startCamPos, endCamPos, easeProgress);
+                controls.target.lerpVectors(startTarget, targetPos, easeProgress);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateCamera);
+                }
+            }
+            requestAnimationFrame(animateCamera);
+        }
+
+        function resetCameraView() {
+            playClickSound();
+            closeInfoDrawer();
+            
+            let startCamPos = camera.position.clone();
+            let startTarget = controls.target.clone();
+            let endCamPos = new THREE.Vector3(0, 65, 120);
+            let endTarget = new THREE.Vector3(0, 0, 0);
+
+            let startTime = performance.now();
+            function animateReset(now) {
+                let elapsed = now - startTime;
+                let progress = Math.min(elapsed / 1000, 1);
+                let easeProgress = 0.5 - Math.cos(progress * Math.PI) / 2;
+
+                camera.position.lerpVectors(startCamPos, endCamPos, easeProgress);
+                controls.target.lerpVectors(startTarget, endTarget, easeProgress);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateReset);
+                }
+            }
+            requestAnimationFrame(animateReset);
+        }
+
+        // Web Speech API Voice Narration in Indonesian
+        function speakPlanetInfo() {
+            if (!selectedPlanet) return;
+            if (!('speechSynthesis' in window)) {
+                showCustomModal('Fitur Tidak Didukung', 'Perangkat/Browser Anda tidak mendukung Web Speech Synthesis.');
+                return;
+            }
+
+            window.speechSynthesis.cancel(); // Stop previous speech
+
+            const textToSpeak = `${selectedPlanet.name}. ${selectedPlanet.tagline}. ${selectedPlanet.desc} Fakta unik: ${selectedPlanet.fact}`;
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.lang = 'id-ID';
+            utterance.rate = 0.95;
+
+            window.speechSynthesis.speak(utterance);
+            playClickSound();
+        }
+
+        function toggleOrbits() {
+            orbitsVisible = !orbitsVisible;
+            orbitLines.forEach(line => line.visible = orbitsVisible);
+            const btn = document.getElementById('btn-orbits');
+            if (orbitsVisible) {
+                btn.classList.add('text-cyan-400', 'bg-cyan-500/10');
+                btn.classList.remove('text-slate-500');
+            } else {
+                btn.classList.remove('text-cyan-400', 'bg-cyan-500/10');
+                btn.classList.add('text-slate-500');
+            }
+            playClickSound();
+        }
+
+        function changeSpeed(val) {
+            simSpeed = parseFloat(val);
+            playClickSound();
+        }
+
+        function switchGameMode(mode) {
+            currentMode = mode;
+            playClickSound();
+
+            // Update Active Nav Button
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-cyan-500/20', 'text-cyan-300', 'border', 'border-cyan-500/40');
+                btn.classList.add('text-slate-300');
+            });
+            const activeBtn = document.getElementById(`nav-${mode}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-cyan-500/20', 'text-cyan-300', 'border', 'border-cyan-500/40');
+            }
+
+            // Hide all overlays first
+            closeInfoDrawer();
+            document.getElementById('game-order-panel').classList.add('hidden');
+            document.getElementById('game-mission-panel').classList.add('hidden');
+            document.getElementById('game-quiz-panel').classList.add('hidden');
+
+            if (missionTimer) clearInterval(missionTimer);
+
+            if (mode === 'explore') {
+                resetCameraView();
+            } else if (mode === 'order') {
+                document.getElementById('game-order-panel').classList.remove('hidden');
+                initOrderGame();
+            } else if (mode === 'mission') {
+                document.getElementById('game-mission-panel').classList.remove('hidden');
+                initMissionGame();
+            } else if (mode === 'quiz') {
+                document.getElementById('game-quiz-panel').classList.remove('hidden');
+                initQuizGame();
+            }
+        }
+
+        function initOrderGame() {
+            orderSlots = Array(8).fill(null);
+            orderScore = 0;
+            updateOrderUI();
+        }
+
+        function resetOrderGame() {
+            playClickSound();
+            initOrderGame();
+        }
+
+        function updateOrderUI() {
+            document.getElementById('order-score').innerText = `${orderScore} Poin`;
+
+            // Render Target Slots
+            const slotsContainer = document.getElementById('order-slots-container');
+            slotsContainer.innerHTML = '';
+
+            for (let i = 0; i < 8; i++) {
+                const filledPlanet = orderSlots[i];
+                const slotDiv = document.createElement('div');
+                slotDiv.className = `h-20 rounded-2xl border-2 border-dashed ${filledPlanet ? 'border-cyan-400 bg-cyan-950/40' : 'border-slate-700 bg-slate-900/60'} flex flex-col items-center justify-center p-1 relative transition-all`;
+
+                if (filledPlanet) {
+                    slotDiv.innerHTML = `
+                        <span class="text-[10px] font-bold text-cyan-400 absolute top-1 left-2">#${i + 1}</span>
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md" style="background-color: #${filledPlanet.color.toString(16).padStart(6, '0')}">
+                            ${filledPlanet.name.substring(0, 2)}
+                        </div>
+                        <span class="text-[11px] font-bold text-slate-100 mt-1 truncate w-full text-center">${filledPlanet.name}</span>
+                        <button onclick="removePlanetFromSlot(${i})" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-[10px] flex items-center justify-center shadow">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    `;
+                } else {
+                    slotDiv.innerHTML = `
+                        <span class="text-xs font-bold text-slate-500">Orbit #${i + 1}</span>
+                        <span class="text-[10px] text-slate-600">Kosong</span>
+                    `;
+                }
+                slotsContainer.appendChild(slotDiv);
+            }
+
+            // Render Available Planets Pool (Excluding Sun)
+            const poolContainer = document.getElementById('order-planets-pool');
+            poolContainer.innerHTML = '';
+
+            const availablePlanets = PLANETS_DATA.filter(p => p.id !== 'sun' && !orderSlots.includes(p));
+
+            availablePlanets.forEach(planet => {
+                const pBtn = document.createElement('button');
+                pBtn.className = "px-3 py-2 rounded-xl bg-slate-800 hover:bg-cyan-900/50 hover:border-cyan-500/50 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition shadow";
+                pBtn.onclick = () => placePlanetInFirstEmptySlot(planet);
+                pBtn.innerHTML = `
+                    <span class="w-3 h-3 rounded-full" style="background-color: #${planet.color.toString(16).padStart(6, '0')}"></span>
+                    <span>${planet.name}</span>
+                `;
+                poolContainer.appendChild(pBtn);
+            });
+
+            // Check Win Condition
+            if (orderSlots.every(slot => slot !== null)) {
+                checkOrderVictory();
+            }
+        }
+
+        function placePlanetInFirstEmptySlot(planet) {
+            const emptyIdx = orderSlots.findIndex(s => s === null);
+            if (emptyIdx !== -1) {
+                orderSlots[emptyIdx] = planet;
+                playClickSound();
+                updateOrderUI();
+            }
+        }
+
+        function removePlanetFromSlot(index) {
+            orderSlots[index] = null;
+            playClickSound();
+            updateOrderUI();
+        }
+
+        function checkOrderVictory() {
+            // Correct order from Sun outward: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune
+            const correctSequence = ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
+            let correctCount = 0;
+
+            for (let i = 0; i < 8; i++) {
+                if (orderSlots[i].id === correctSequence[i]) {
+                    correctCount++;
+                }
+            }
+
+            if (correctCount === 8) {
+                orderScore = 1000;
+                playSuccessSound();
+                showCustomModal('Luar Biasa! 🎉', 'Kamu berhasil menyusun kedelapan planet sesuai urutan orbitnya dari Matahari secara sempurna!');
+            } else {
+                playErrorSound();
+                showCustomModal('Masih Ada Yang Keliru 🪐', `Kamu berhasil mencocokkan ${correctCount} dari 8 planet. Periksa kembali urutan planet terdekat hingga terjauh dari Matahari!`);
+            }
+        }
+
+        function initMissionGame() {
+            currentMissionIndex = 0;
+            missionScore = 0;
+            loadMissionStep();
+        }
+
+        function loadMissionStep() {
+            if (currentMissionIndex >= MISSION_POOL.length) {
+                playSuccessSound();
+                showCustomModal('Misi Selesai! 🏆', `Selamat Agent Antariksa! Kamu menyelesaikan semua misi dengan skor akhir ${missionScore} Poin!`);
+                switchGameMode('explore');
+                return;
+            }
+
+            const currentMission = MISSION_POOL[currentMissionIndex];
+            document.getElementById('mission-step-indicator').innerText = `Misi ${currentMissionIndex + 1} dari ${MISSION_POOL.length}`;
+            document.getElementById('mission-clue-text').innerText = currentMission.clue;
+            document.getElementById('mission-score').innerText = `Skor Misi: ${missionScore}`;
+
+            // Reset Timer
+            missionTimeLeft = 25;
+            document.getElementById('mission-timer').innerText = `${missionTimeLeft}s`;
+
+            if (missionTimer) clearInterval(missionTimer);
+
+            missionTimer = setInterval(() => {
+                missionTimeLeft--;
+                document.getElementById('mission-timer').innerText = `${missionTimeLeft}s`;
+
+                if (missionTimeLeft <= 0) {
+                    clearInterval(missionTimer);
+                    playErrorSound();
+                    showCustomModal('Waktu Habis! ⏰', 'Waktu mencari planet telah habis. Coba lagi untuk menyelesaikan misi detektif!');
+                    loadMissionStep();
+                }
+            }, 1000);
+        }
+
+        function checkMissionTarget(clickedPlanetId) {
+            const currentMission = MISSION_POOL[currentMissionIndex];
+
+            if (clickedPlanetId === currentMission.targetId) {
+                if (missionTimer) clearInterval(missionTimer);
+                playSuccessSound();
+
+                const timeBonus = missionTimeLeft * 10;
+                missionScore += 100 + timeBonus;
+
+                currentMissionIndex++;
+                showCustomModal('Tepat Sekali! Target Ditemukan 🎯', `Bagus sekali! Kamu menemukan ${PLANETS_DATA.find(p=>p.id===clickedPlanetId).name}! Bonus Waktu: +${timeBonus} Poin.`);
+                loadMissionStep();
+            } else {
+                playErrorSound();
+                missionScore = Math.max(0, missionScore - 20);
+                document.getElementById('mission-score').innerText = `Skor Misi: ${missionScore}`;
+            }
+        }
+
+        function initQuizGame() {
+            quizIndex = 0;
+            quizScore = 0;
+            renderQuizQuestion();
+        }
+
+        function renderQuizQuestion() {
+            const qData = QUIZ_QUESTIONS[quizIndex];
+            document.getElementById('quiz-question-number').innerText = `Pertanyaan ${quizIndex + 1}/${QUIZ_QUESTIONS.length}`;
+            document.getElementById('quiz-score').innerText = `${quizScore} Poin`;
+            document.getElementById('quiz-question-text').innerText = qData.q;
+
+            // Hide feedback and next button
+            document.getElementById('quiz-feedback-box').classList.add('hidden');
+            document.getElementById('btn-quiz-next').classList.add('hidden');
+
+            // Options Buttons
+            const optionsContainer = document.getElementById('quiz-options-container');
+            optionsContainer.innerHTML = '';
+
+            qData.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "quiz-opt-btn p-3.5 rounded-2xl bg-slate-800/80 hover:bg-indigo-900/40 hover:border-indigo-500/50 text-slate-200 text-xs sm:text-sm font-semibold border border-slate-700/80 text-left transition flex items-center justify-between";
+                btn.onclick = () => handleQuizAnswer(idx, btn);
+                btn.innerHTML = `
+                    <span>${opt}</span>
+                    <i class="fa-regular fa-circle text-slate-500"></i>
+                `;
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function handleQuizAnswer(selectedIndex, clickedBtn) {
+            const qData = QUIZ_QUESTIONS[quizIndex];
+            const allOptBtns = document.querySelectorAll('.quiz-opt-btn');
+
+            // Disable all option buttons
+            allOptBtns.forEach(btn => btn.disabled = true);
+
+            const feedbackBox = document.getElementById('quiz-feedback-box');
+            feedbackBox.classList.remove('hidden');
+
+            if (selectedIndex === qData.answer) {
+                playSuccessSound();
+                quizScore += 200;
+                clickedBtn.classList.remove('bg-slate-800/80', 'border-slate-700/80');
+                clickedBtn.classList.add('bg-emerald-950/60', 'border-emerald-500', 'text-emerald-300');
+                clickedBtn.querySelector('i').className = "fa-solid fa-circle-check text-emerald-400";
+
+                feedbackBox.className = "p-3.5 rounded-2xl text-xs leading-relaxed bg-emerald-950/40 border border-emerald-500/30 text-emerald-200";
+                feedbackBox.innerHTML = `<strong>Jawaban Benar! 🎉</strong> ${qData.exp}`;
+            } else {
+                playErrorSound();
+                clickedBtn.classList.remove('bg-slate-800/80', 'border-slate-700/80');
+                clickedBtn.classList.add('bg-rose-950/60', 'border-rose-500', 'text-rose-300');
+                clickedBtn.querySelector('i').className = "fa-solid fa-circle-xmark text-rose-400";
+
+                // Highlight correct option
+                const correctBtn = allOptBtns[qData.answer];
+                correctBtn.classList.add('bg-emerald-950/40', 'border-emerald-500/50', 'text-emerald-300');
+
+                feedbackBox.className = "p-3.5 rounded-2xl text-xs leading-relaxed bg-rose-950/40 border border-rose-500/30 text-rose-200";
+                feedbackBox.innerHTML = `<strong>Kurang Tepat.</strong> ${qData.exp}`;
+            }
+
+            document.getElementById('quiz-score').innerText = `${quizScore} Poin`;
+            document.getElementById('btn-quiz-next').classList.remove('hidden');
+        }
+
+        function nextQuizQuestion() {
+            playClickSound();
+            quizIndex++;
+            if (quizIndex < QUIZ_QUESTIONS.length) {
+                renderQuizQuestion();
+            } else {
+                playSuccessSound();
+                showCustomModal('Kuis Selesai! 🎓', `Luar biasa! Kamu menyelesaikan Kuis Astronomi dengan skor total ${quizScore} Poin!`);
+                switchGameMode('explore');
+            }
+        }
+
+        function showCustomModal(title, message) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('custom-modal').classList.remove('hidden');
+        }
+
+        function closeCustomModal() {
+            playClickSound();
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+
+        window.onload = function() {
+            initThreeScene();
+        };
+    </script>
+</body>
+</html>
